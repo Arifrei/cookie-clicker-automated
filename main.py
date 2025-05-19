@@ -1,5 +1,7 @@
+import selenium
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import StaleElementReferenceException
 import time
 
 chrome_options = webdriver.ChromeOptions()
@@ -13,24 +15,28 @@ def click_cookie():
 
 def buy_items():
     store_items = driver.find_elements(By.CSS_SELECTOR, "#store > div:not(.grayed)")
-    cookies_element = driver.find_element(By.ID, "money").text
-    if "," in cookies_element:
-        cookies_element = cookies_element.replace(",", "")
+    cookies_element = driver.find_element(By.ID, "money").text.replace(",", "")
     cookies = int(cookies_element)
-    locator = None
+    affordable_items = []
     for item in store_items:
         cost_element = item.find_element(By.TAG_NAME, "b")
-        cost = cost_element.text.split("-")[1]
-        if "," in cost:
-            cost = cost.replace(",", "")
-        if int(cost) < cookies:
-            locator = item.get_attribute("id")
-    if locator:
-        item_to_buy = driver.find_element(By.ID, locator)
-        item_to_buy.click()
+        cost = cost_element.text.split("-")[1].replace(",", "").strip()
+        if int(cost) <= cookies:
+            affordable_items.append((cost, item.get_attribute("id")))
+    if affordable_items:
+        most_expensive = max(affordable_items, key=lambda x: x[0])
+        try:
+            item_to_buy = driver.find_element(By.ID, most_expensive[1])
+            item_to_buy.click()
+        except selenium.common.exceptions.StaleElementReferenceException:
+            time.sleep(0.1)
+            item_to_buy = driver.find_element(By.ID, most_expensive[1])
+            item_to_buy.click()
+
 
 start_time = time.time()
-while True:
+end_time = time.time() + 600
+while time.time() < end_time:
     click_cookie()
     if time.time() - start_time > 2.5:
         buy_items()
